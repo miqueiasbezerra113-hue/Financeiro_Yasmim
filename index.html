@@ -449,7 +449,7 @@ function abrirDlg(t){
           cartao:v('cartao'), novoCartao:v('novoCartao'), parcelas:v('parcelas') };
     const btn=$('#salvar'); btn.disabled=true; btn.textContent='Salvando…'; $('#lmsg').textContent='';
     try {
-      const msg = await api(t==='ent'?'salvarEntrada':t==='sai'?'salvarSaida':'salvarCorrida', d);
+      const msg = await api(t==='ent'?'salvarEntrada':t==='sai'?'salvarSaida', d);
       dlg.close(); toast(msg);
       cfg = await api('init'); carregar();
     } catch(err){ $('#lmsg').textContent = err.message; btn.disabled=false; btn.textContent='Salvar'; }
