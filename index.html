@@ -119,7 +119,7 @@ button{cursor:pointer}
 /* ações fixas */
 .dock{position:fixed;left:0;right:0;bottom:0;padding:12px 16px calc(12px + env(safe-area-inset-bottom));
   background:linear-gradient(transparent,var(--bg) 40%)}
-.dock .in{max-width:720px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.dock .in{max-width:720px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
 .btn{border:0;border-radius:12px;padding:14px 10px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px}
 .btn.e{background:var(--ent);color:#fff} .btn.s{background:var(--sai);color:#fff} .btn.n{background:var(--ink);color:var(--bg)}
 .btn.ghost{background:var(--surf);border:1px solid var(--line)}
@@ -162,12 +162,14 @@ input,select{background:var(--bg);border:1px solid var(--line);border-radius:10p
   <nav class="tabs" role="tablist">
     <button role="tab" id="tPainel" aria-selected="true">Painel</button>
     <button role="tab" id="tLista" aria-selected="false">Lançamentos</button>
+    <button role="tab" id="tR99" aria-selected="false">Resumo 99</button>
     <button role="tab" id="tOrc" aria-selected="false">Orçamento</button>
   </nav>
 
   <div id="erro" class="erro hide" role="alert"></div>
   <section id="vPainel"></section>
   <section id="vLista" class="hide"></section>
+  <section id="vR99" class="hide"></section>
   <section id="vOrc" class="hide"></section>
 </div>
 
@@ -175,6 +177,7 @@ input,select{background:var(--bg);border:1px solid var(--line);border-radius:10p
   <div class="in">
     <button class="btn e" data-novo="ent"><svg class="ico" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Entrada</button>
     <button class="btn s" data-novo="sai"><svg class="ico" viewBox="0 0 24 24"><path d="M5 12h14"/></svg>Saída</button>
+    <button class="btn n" data-novo="99"><svg class="ico" viewBox="0 0 24 24"><path d="M3 13l2-6h14l2 6M3 13v5h3M21 13v5h-3M3 13h18"/><circle cx="8" cy="18" r="1.5"/><circle cx="16" cy="18" r="1.5"/></svg>99</button>
   </div>
 </div>
 
@@ -182,7 +185,9 @@ input,select{background:var(--bg);border:1px solid var(--line);border-radius:10p
 
 <script>
 /* ===== Configuração ===== */
-const API_URL = 'https://script.google.com/macros/s/AKfycbxKKNr6rFF-DdoVXvjK3mroNJj45kfYnlWu8CAfDLsB443dMd1Qy5lRDjCv8fbkb5Y/exec';
+/* Cole aqui o mesmo PIN definido com definirPin() no Apps Script. */
+const PIN = 'COLE_SEU_PIN_AQUI';
+const API_URL = 'https://script.google.com/macros/s/AKfycbxylbSjIf9CaWmEjjxIOBLl1mW_rTqiLwTU3bDwq3ECEcNwYlmPx2MBEGakMXWNYFTK/exec';
 
 /* ===== Utilitários ===== */
 const $ = s => document.querySelector(s);
@@ -200,7 +205,7 @@ let cfg = null;
 
 async function api(acao, dados={}) {
   const r = await fetch(API_URL, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
-    body: JSON.stringify({ acao, dados }) });
+    body: JSON.stringify({ pin: PIN, acao, dados }) });
   let j; try { j = await r.json(); } catch { throw new Error('Resposta inválida da API. Verifique a implantação.'); }
   if (!j.ok) throw new Error(j.erro);
   return j.dados;
@@ -214,12 +219,13 @@ function limparErro(){ $('#erro').classList.add('hide'); }
 $('#prev').onclick = () => mudarMes(-1);
 $('#next').onclick = () => mudarMes(1);
 function mudarMes(d){ let [a,m]=mes.split('-').map(Number); const dt=new Date(a,m-1+d,1); mes=`${dt.getFullYear()}-${pad(dt.getMonth()+1)}`; carregar(); }
-const ABAS = { painel:['#tPainel','#vPainel'], lista:['#tLista','#vLista'], orc:['#tOrc','#vOrc'] };
+const ABAS = { painel:['#tPainel','#vPainel'], lista:['#tLista','#vLista'], r99:['#tR99','#vR99'], orc:['#tOrc','#vOrc'] };
 function setAba(a){ aba=a;
   for (const k in ABAS){ $(ABAS[k][0]).setAttribute('aria-selected',k===a); $(ABAS[k][1]).classList.toggle('hide',k!==a); }
   carregar(); }
 $('#tPainel').onclick = () => setAba('painel');
 $('#tLista').onclick = () => setAba('lista');
+$('#tR99').onclick = () => setAba('r99');
 $('#tOrc').onclick = () => setAba('orc');
 
 /* ===== Carregar dados ===== */
@@ -231,10 +237,10 @@ async function carregar(){
   alvo.innerHTML = '<div class="skel"></div><div class="skel"></div>';
   try {
     if (!cfg) cfg = await api('init');
-    const acao = { painel:'painel', lista:'listar', orc:'orcamento' }[aba];
+    const acao = { painel:'painel', lista:'listar', r99:'resumo99', orc:'orcamento' }[aba];
     const dados = await api(acao, { mes });
     if (my !== seq) return;
-    ({ painel:renderPainel, lista:renderLista, orc:renderOrc })[aba](dados);
+    ({ painel:renderPainel, lista:renderLista, r99:renderR99, orc:renderOrc })[aba](dados);
   } catch(e){ if (my===seq){ alvo.innerHTML=''; mostrarErro(e); } }
 }
 
@@ -299,6 +305,22 @@ function ligarTooltip(serie){
     c.addEventListener('click',()=>abrir(c));
   });
   document.addEventListener('scroll',fechar,{once:true,passive:true});
+}
+
+/* ===== Resumo 99 ===== */
+function renderR99(r){
+  const n1 = v => v.toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1});
+  const kv = (l,v,c='') => `<div class="kv"><span>${l}</span><b class="num ${c}">${v}</b></div>`;
+  $('#vR99').innerHTML = !r.turnos ? '<div class="vazio">Nenhum turno 99 neste mês. Toque em 99 para registrar.</div>' : `
+  <div class="hero"><div class="lbl">Ganhos 99 em ${esc(mesNome(r.mes))}</div>
+    <div class="big num e-c">${brl(r.ganhos)}</div>
+    <div class="lbl"><b class="num">${brl(r.porHora)}</b> por hora · <b class="num">${brl(r.porKm)}</b> por km</div></div>
+  <div class="block">
+    ${kv('Turnos registrados',r.turnos)}${kv('Corridas',r.corridas)}${kv('KM rodados',n1(r.km))}${kv('Horas trabalhadas',n1(r.horas))}
+    ${kv('Ganho por KM',brl(r.porKm))}${kv('Ganho por hora',brl(r.porHora))}${kv('Ganho por corrida',brl(r.porCorrida))}
+    ${kv('Gastos em Transporte',brl(r.transporte),'s-c')}
+    <div class="kv dest"><span>Resultado após transporte</span><b class="num ${r.resultado<0?'s-c':'e-c'}">${brl(r.resultado)}</b></div>
+  </div>`;
 }
 
 /* ===== Orçamento ===== */
@@ -367,7 +389,7 @@ $('#vLista').onclick = async e => {
 /* ===== Diálogo de lançamento ===== */
 const opts = (l, extra='') => l.map(o=>`<option>${esc(o)}</option>`).join('') + extra;
 const NOVO = '<option value="__novo__">+ Nova…</option>';
-const TITULOS = { ent:'Nova entrada', sai:'Nova saída' };
+const TITULOS = { ent:'Nova entrada', sai:'Nova saída', 99:'Novo turno 99' };
 
 document.addEventListener('click', e => { const b=e.target.closest('[data-novo]'); if(b) abrirDlg(b.dataset.novo); });
 
@@ -389,6 +411,12 @@ function campos(t){
       <label id="wNovoCartao" class="hide">Nome do novo cartão<input id="novoCartao" maxlength="40"></label>
       <label id="wParc" class="hide">Parcelas<input id="parcelas" type="number" min="1" max="48" value="1"></label>
     </div>`;
+  return `<label>Data<input id="data" type="date" value="${hoje()}" required></label>
+    <div class="row"><label>KM inicial<input id="kmInicial" type="number" step="0.1" min="0" inputmode="decimal" required></label>
+    <label>KM final<input id="kmFinal" type="number" step="0.1" min="0" inputmode="decimal" required></label></div>
+    <label>Ganhos (R$)<input id="ganhos" type="number" step="0.01" min="0.01" inputmode="decimal" required></label>
+    <div class="row"><label>Horas<input id="horas" type="number" step="0.1" min="0" inputmode="decimal"></label>
+    <label>Corridas<input id="corridas" type="number" step="1" min="0" inputmode="numeric"></label></div>`;
 }
 
 function abrirDlg(t){
@@ -396,7 +424,7 @@ function abrirDlg(t){
   $('#dlgBody').innerHTML = `<div class="head"><h3>${TITULOS[t]}</h3>
     <button class="link" type="button" id="fechar">Cancelar</button></div>
     <form id="fLanc" class="f" novalidate>${campos(t)}<div id="lmsg" class="msg" role="alert"></div>
-    <button class="btn ${t==='ent'?'e':'s'}" type="submit" id="salvar">Salvar</button></form>`;
+    <button class="btn ${t==='ent'?'e':t==='sai'?'s':'n'}" type="submit" id="salvar">Salvar</button></form>`;
   const dlg = $('#dlg'); dlg.showModal();
   $('#fechar').onclick = () => dlg.close();
 
@@ -414,11 +442,13 @@ function abrirDlg(t){
   $('#fLanc').onsubmit = async e => {
     e.preventDefault();
     const v = id => { const el=$('#'+id); return el ? el.value : undefined; };
-    const d = { valor:v('valor'), data:v('data'), categoria:v('categoria'), novaCategoria:v('novaCategoria'), desc:v('desc'), meio:v('meio'),
+    const d = t==='99'
+      ? { data:v('data'), kmInicial:v('kmInicial'), kmFinal:v('kmFinal'), ganhos:v('ganhos'), horas:v('horas'), corridas:v('corridas') }
+      : { valor:v('valor'), data:v('data'), categoria:v('categoria'), novaCategoria:v('novaCategoria'), desc:v('desc'), meio:v('meio'),
           cartao:v('cartao'), novoCartao:v('novoCartao'), parcelas:v('parcelas') };
     const btn=$('#salvar'); btn.disabled=true; btn.textContent='Salvando…'; $('#lmsg').textContent='';
     try {
-      const msg = await api(t==='ent'?'salvarEntrada':'salvarSaida', d);
+      const msg = await api(t==='ent'?'salvarEntrada':t==='sai'?'salvarSaida':'salvarCorrida', d);
       dlg.close(); toast(msg);
       cfg = await api('init'); carregar();
     } catch(err){ $('#lmsg').textContent = err.message; btn.disabled=false; btn.textContent='Salvar'; }
